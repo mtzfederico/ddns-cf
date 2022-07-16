@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Jeffail/gabs"
 	"github.com/TwiN/go-color"
@@ -24,6 +25,7 @@ var Config conf
 var httpClient *http.Client
 
 type conf struct {
+	Name              string
 	Domain            string `yaml:"Domain" binding:"required"`
 	DomainZoneID      string `yaml:"DomainZoneID"`
 	SubDomainToUpdate string `yaml:"SubDomainToUpdate"`
@@ -52,6 +54,13 @@ func (c *conf) get(configPath string) *conf {
 	err = yaml.Unmarshal(yamlFile, c)
 	if err != nil {
 		log.Fatalf("Unmarshal: %v", err)
+	}
+
+	c.Name = ""
+	if c.SubDomainToUpdate == "" {
+		c.Name = c.Domain
+	} else {
+		c.Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
 	}
 
 	return c
@@ -147,12 +156,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 		Config.DomainZoneID = zoneID // save for later use but don't save to file
 	}
 
-	name := ""
-	if Config.SubDomainToUpdate == "" {
-		name = Config.Domain
-	} else {
-		name = fmt.Sprintf("%s.%s", Config.SubDomainToUpdate, Config.Domain)
-	}
+	name := Config.Name
 
 	path := fmt.Sprintf("zones/%s/dns_records?type=%s&name=%s", zoneID, recordType, name)
 	resp := sendRequest(path, "GET", nil)
@@ -212,12 +216,7 @@ func updateRecord(recordID string, recordType string, IP string) {
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
 	}
-	name := ""
-	if Config.SubDomainToUpdate == "" {
-		name = Config.Domain
-	} else {
-		name = fmt.Sprintf("%s.%s", Config.SubDomainToUpdate, Config.Domain)
-	}
+	name := Config.Name
 
 	var requestBody RecordData
 	requestBody.Type = recordType
@@ -300,6 +299,8 @@ func main() {
 	if Config.DisableIPv4 && Config.DisableIPv6 {
 		log.Fatal("IPv4 and IPv6 can't be disabled at the same time")
 	}
+
+	fmt.Printf("%s[%s%s%s] Checking %s%s\n", color.Cyan, color.Reset, time.Now().Format(time.RFC3339), color.Cyan, color.Reset, Config.Name)
 
 	httpClient = &http.Client{}
 
