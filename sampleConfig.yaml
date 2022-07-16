@@ -1,0 +1,5 @@
+Domain: "<domain.tld>"
+DomainZoneID: "<DomainZoneID>"
+SubDomainToUpdate: "<subdomain>" # Leave empty (or removed) to modify the domain's root
+APIKey: "<Your API Key>"
+Email: "<Your CloudFlare account's email address>"
