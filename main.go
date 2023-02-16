@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type conf struct {
 	DisableIPv4       bool   `yaml:"DisableIPv4"`
 	DisableIPv6       bool   `yaml:"DisableIPv6"`
 	Verbose           bool   `yaml:"Verbose"`
+	ScriptOnChange    string `yaml:"ScriptOnChange"`
 }
 
 type RecordData struct {
@@ -64,6 +66,20 @@ func (c *conf) get(configPath string) *conf {
 	}
 
 	return c
+}
+
+func runUpdateScript(IPversion string, OldIP string, NewIP string) {
+	scriptPath := Config.ScriptOnChange
+	if scriptPath == "" {
+		return
+	}
+
+	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP).Output()
+	if err != nil {
+		fmt.Printf("%s[runUpdateScript] Error with%s %s: %s\n", color.Red, color.Reset, IPversion, err)
+		return
+	}
+	log.Printf("[runUpdateScript] %s: %s", IPversion, out)
 }
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
@@ -270,6 +286,7 @@ func updateIP(IPversion string) {
 	if domainIP != IP {
 		fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
 		updateRecord(recordID, recordType, IP)
+		runUpdateScript(IPversion, domainIP, IP)
 	} else {
 		fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
 	}
