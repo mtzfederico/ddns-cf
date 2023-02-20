@@ -246,7 +246,7 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 	success, ok := resp.S("success").Data().(bool)
 	if !ok {
-		fmt.Println("Error decoding zoneID")
+		fmt.Println("Error decoding response")
 	}
 
 	if !success {
@@ -255,6 +255,38 @@ func updateRecord(recordID string, recordType string, IP string) {
 		return
 	}
 	fmt.Printf("%s%s record changed successfully%s\n", color.Green, recordType, color.Reset)
+}
+
+func createRecord(recordType string, IP string) {
+	// https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
+	path := fmt.Sprintf("zones/%s/dns_records", Config.DomainZoneID)
+	ttl := Config.RecordTTL
+	if ttl == 0 {
+		ttl = 1 // 1 is Automatic
+	}
+	name := Config.Name
+
+	var requestBody RecordData
+	requestBody.Type = recordType
+	requestBody.Name = name
+	requestBody.Content = IP
+	requestBody.TTL = ttl
+	requestBody.Proxied = Config.IsProxied
+
+	requestData, _ := json.Marshal((requestBody))
+	resp := sendRequest(path, "POST", requestData)
+
+	success, ok := resp.S("success").Data().(bool)
+	if !ok {
+		fmt.Println("Error decoding response")
+	}
+
+	if !success {
+		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
+		fmt.Printf("Failed to create record: %s", errorMessage)
+		return
+	}
+	fmt.Printf("%s%s record created successfully%s\n", color.Green, recordType, color.Reset)
 }
 
 func updateIP(IPversion string) {
@@ -278,8 +310,16 @@ func updateIP(IPversion string) {
 
 	domainIP, recordID, err := getCurrentValue(recordType) // returns "" when there is no value
 
+	if err != nil && domainIP == "" && recordID == "" {
+		// create the record
+		fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
+		createRecord(recordType, IP)
+		runUpdateScript(IPversion, domainIP, IP)
+		return
+	}
+
 	if err != nil {
-		fmt.Printf("%sError getting the domain's %s%s%s record: %s%s\n", color.Red, color.Reset, recordType, color.Red, color.Reset, err)
+		fmt.Printf("%sError getting the domain's %s%s%s record: %s%s\n%sdomainIP:%s %s\n%srecordID:%s %s\n", color.Red, color.Reset, recordType, color.Red, color.Reset, err, color.Red, color.Reset, domainIP, color.Red, color.Reset, recordID)
 		return
 	}
 
