@@ -1,4 +1,7 @@
 .DS_Store
 config.yaml
 bin/
+.vscode
+.vscode/*
 *.log
+notifyScript.sh
