@@ -26,6 +26,7 @@ var Config conf
 var httpClient *http.Client
 
 type conf struct {
+	// Complete FQDN to update
 	Name              string
 	Domain            string `yaml:"Domain" binding:"required"`
 	DomainZoneID      string `yaml:"DomainZoneID"`
@@ -74,7 +75,7 @@ func runUpdateScript(IPversion string, OldIP string, NewIP string) {
 		return
 	}
 
-	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP).Output()
+	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config.Name).Output()
 	if err != nil {
 		fmt.Printf("%s[runUpdateScript] Error with%s %s: %s\n", color.Red, color.Reset, IPversion, err)
 		return
@@ -180,16 +181,16 @@ func getCurrentValue(recordType string) (string, string, error) {
 	success, ok := resp.Path("success").Data().(bool)
 
 	if !ok {
-		return "", "", errors.New("Failed to decode JSON")
+		return "", "", errors.New("failed to decode JSON")
 	}
 
 	if !success {
 		error := resp.S("errors").Index(0)
 		errorCode := error.Path("code").Data().(string)
 		if errorCode == "7003" {
-			return "", "", errors.New("Domain/subdomain does not exist")
+			return "", "", errors.New("domain/subdomain does not exist")
 		}
-		return "", "", errors.New(fmt.Sprintf("errorCode: %s: %s", errorCode, error.Path("message").Data().(string)))
+		return "", "", fmt.Errorf("errorCode: %s: %s", errorCode, error.Path("message").Data().(string))
 	}
 
 	result := resp.S("result")
@@ -201,25 +202,26 @@ func getCurrentValue(recordType string) (string, string, error) {
 
 	// the subdomain exists but there is no record for this type. There is an A record but no AAAA record or vice versa.
 	if resultLen == 0 {
-		return "", "", errors.New(fmt.Sprintf("No record of type %s for %s", recordType, name))
+		return "", "", fmt.Errorf("no record of type %s for %s", recordType, name)
 	}
 
 	content, ok := result.Index(0).Path("content").Data().(string) // The record's value
 	if !ok {
-		return "", "", errors.New("Failed to decode the record's value from JSON")
+		return "", "", errors.New("failed to decode the record's value from JSON")
 	}
 
 	if content == "" {
-		return content, "", errors.New(fmt.Sprintf("No Content for %s's %s record", name, recordType))
+		return content, "", fmt.Errorf("no Content for %s's %s record", name, recordType)
+
 	}
 
 	RecordID, ok := result.Index(0).Path("id").Data().(string) // The id of the actual A or AAAA record, needed to update it.
 	if !ok {
-		return "", "", errors.New("Failed to decode the record's ID from JSON")
+		return "", "", errors.New("failed to decode the record's ID from JSON")
 	}
 
 	if RecordID == "" {
-		return content, "", errors.New(fmt.Sprintf("No recordID for %s's %s record", name, recordType))
+		return content, "", fmt.Errorf("no recordID for %s's %s record", name, recordType)
 	}
 
 	return content, RecordID, nil
