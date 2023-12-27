@@ -7,12 +7,13 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os/exec"
 	"strings"
 	"time"
+	"os"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/Jeffail/gabs"
 	"github.com/TwiN/go-color"
 	"gopkg.in/yaml.v2"
@@ -39,6 +40,8 @@ type conf struct {
 	DisableIPv6       bool   `yaml:"DisableIPv6"`
 	Verbose           bool   `yaml:"Verbose"`
 	ScriptOnChange    string `yaml:"ScriptOnChange"`
+	LogFile           string `yaml:"LogFile" binding:"required"`
+	DebugLevel        string `yaml:"DebugLevel" binding:"required"`
 }
 
 type RecordData struct {
@@ -66,6 +69,11 @@ func (c *conf) get(configPath string) *conf {
 		c.Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
 	}
 
+	if c.LogFile == "" {
+		c.LogFile = "/var/log/ddns-cf/ddns-cf.log"
+		fmt.Println("[WARNING] Using default logging path (/var/log/ddns-cf/ddns-cf.log)")
+	}
+
 	return c
 }
 
@@ -78,6 +86,7 @@ func runUpdateScript(IPversion string, OldIP string, NewIP string) {
 	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config.Name).Output()
 	if err != nil {
 		fmt.Printf("%s[runUpdateScript] Error with%s %s: %s\n", color.Red, color.Reset, IPversion, err)
+		log.WithFields(log.Fields{"out": out, "err": err}).Error("[runUpdateScript] Error from script")
 		return
 	}
 	log.Printf("[runUpdateScript] %s: %s", IPversion, out)
@@ -109,7 +118,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		log.Fatalf("An Error Occured %v", err)
+		log.WithFields(log.Fields{"err": err}).Fatal("[sendRequest] httpClient error")
 	}
 	defer resp.Body.Close()
 
@@ -156,7 +165,7 @@ func getZoneID() string {
 	resp := sendRequest(url, "GET", nil)
 	zoneID, ok := resp.S("result").Index(0).Path("id").Data().(string)
 	if !ok {
-		fmt.Println("Error decoding zoneID")
+		log.WithFields(log.Fields{"resp": resp}).Error("[getZoneID] Error decoding zoneID")
 	}
 	return zoneID
 }
@@ -248,15 +257,18 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 	success, ok := resp.S("success").Data().(bool)
 	if !ok {
-		fmt.Println("Error decoding response")
+		fmt.Println("[updateRecord] Error decoding response. ", resp)
+		log.WithFields(log.Fields{"resp": resp}).Error("[updateRecord] Error decoding response")
 	}
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
 		fmt.Printf("Failed to update the record: %s", errorMessage)
+		log.WithFields(log.Fields{"errorMessage": errorMessage}).Error("[updateRecord] Failed to update the record")
 		return
 	}
 	fmt.Printf("%s%s record changed successfully%s\n", color.Green, recordType, color.Reset)
+	log.WithFields(log.Fields{"recordType": recordType}).Info("record changed successfully")
 }
 
 func createRecord(recordType string, IP string) {
@@ -280,15 +292,17 @@ func createRecord(recordType string, IP string) {
 
 	success, ok := resp.S("success").Data().(bool)
 	if !ok {
-		fmt.Println("Error decoding response")
+		log.Error("[createRecord] Error decoding response")
 	}
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
-		fmt.Printf("Failed to create record: %s", errorMessage)
+		fmt.Println("[createRecord] Failed to create record: ", errorMessage)
+		log.WithFields(log.Fields{"errorMessage": errorMessage}).Info("[createRecord] Failed to create record")
 		return
 	}
 	fmt.Printf("%s%s record created successfully%s\n", color.Green, recordType, color.Reset)
+	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
 }
 
 func updateIP(IPversion string) {
@@ -298,7 +312,7 @@ func updateIP(IPversion string) {
 	} else if IPversion == "v6" {
 		recordType = "AAAA"
 	} else {
-		fmt.Println("Invalid IP Version.", IPversion)
+		log.Error("Invalid IP Version.", IPversion)
 		return
 	}
 
@@ -307,6 +321,7 @@ func updateIP(IPversion string) {
 
 	if IP == "" {
 		fmt.Printf("%sNo IP%s address found%s\n", color.Red, IPversion, color.Red)
+		log.WithFields(log.Fields{"Version": IPversion}).Info("No IP address found")
 		return
 	}
 
@@ -315,30 +330,51 @@ func updateIP(IPversion string) {
 	if err != nil && domainIP == "" && recordID == "" {
 		// create the record
 		fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
+		log.WithFields(log.Fields{"Version": IPversion, "IP": IP}).Info("IP address detected for the first time")
 		createRecord(recordType, IP)
 		runUpdateScript(IPversion, domainIP, IP)
 		return
 	}
 
 	if err != nil {
-		fmt.Printf("%sError getting the domain's %s%s%s record: %s%s\n%sdomainIP:%s %s\n%srecordID:%s %s\n", color.Red, color.Reset, recordType, color.Red, color.Reset, err, color.Red, color.Reset, domainIP, color.Red, color.Reset, recordID)
+		log.Error("%sError getting the domain's %s%s%s record: %s%s\n%sdomainIP:%s %s\n%srecordID:%s %s\n", color.Red, color.Reset, recordType, color.Red, color.Reset, err, color.Red, color.Reset, domainIP, color.Red, color.Reset, recordID)
 		return
 	}
 
 	if domainIP != IP {
 		fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
+		log.WithFields(log.Fields{"Version": IPversion, "from": domainIP, "to": IP}).Info("IP address changed")
 		updateRecord(recordID, recordType, IP)
 		runUpdateScript(IPversion, domainIP, IP)
 	} else {
 		fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
+		log.WithFields(log.Fields{"Version": IPversion, "ip": IP}).Info("IP address has not changed")
 	}
 }
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to the configuration file")
 	flag.Parse()
-
 	Config.get(*configPath)
+
+	// If the file doesn't exist, create it, otherwise append to the file
+	file, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.WithField("Error", err).Fatal("Logging file error")
+	}
+
+	log.SetOutput(file)
+
+	if Config.DebugLevel != "" {
+		level, err := log.ParseLevel(Config.DebugLevel)
+		if err != nil {
+			log.Error("DebugLevel has an invalid value")
+		} else {
+			log.Info("Log Level set to ", Config.DebugLevel)
+			log.SetLevel(level)
+		}
+	}
+
 	if Config.APIKey == "" {
 		log.Fatal("No APIkey found in config.yaml")
 	}
@@ -374,7 +410,6 @@ func main() {
 }
 
 // Todo:
-// * Test it
 // * Add/create domain/record if it doesn't exist
 // * Create install script that compiles and creates systemd timer
 // * Upload to github
