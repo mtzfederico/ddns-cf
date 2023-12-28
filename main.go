@@ -6,16 +6,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
-	"os"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/Jeffail/gabs"
 	"github.com/TwiN/go-color"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -53,7 +53,7 @@ type RecordData struct {
 }
 
 func (c *conf) get(configPath string) *conf {
-	yamlFile, err := ioutil.ReadFile(configPath)
+	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
 		log.Printf("yamlFile.Get err   #%v ", err)
 	}
@@ -85,11 +85,10 @@ func runUpdateScript(IPversion string, OldIP string, NewIP string) {
 
 	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config.Name).Output()
 	if err != nil {
-		fmt.Printf("%s[runUpdateScript] Error with%s %s: %s\n", color.Red, color.Reset, IPversion, err)
-		log.WithFields(log.Fields{"out": out, "err": err}).Error("[runUpdateScript] Error from script")
+		log.WithFields(log.Fields{"IPversion": IPversion, "out": out, "err": err}).Error("[runUpdateScript] Error from script")
 		return
 	}
-	log.Printf("[runUpdateScript] %s: %s", IPversion, out)
+	log.WithFields(log.Fields{"IPversion": IPversion, "out": out}).Info("[runUpdateScript] Script ran")
 }
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
@@ -122,7 +121,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -134,7 +133,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	jsonParsed, err := gabs.ParseJSON(body)
 
 	if err != nil {
-		log.Fatal(("Failed to parse JSON"))
+		log.WithFields(log.Fields{"path": path, "method": method, "responseBody": body}).Fatal(("[sendRequest] Failed to parse JSON"))
 	}
 
 	return jsonParsed
@@ -151,7 +150,7 @@ func getIP(ipVersion string) string {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -177,7 +176,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	zoneID := Config.DomainZoneID
 
 	if zoneID == "" {
-		fmt.Println("ZoneID not in config file, fetching from CF.")
+		log.Info("ZoneID not in config file, fetching from CF.")
 		zoneID = getZoneID()
 		Config.DomainZoneID = zoneID // save for later use but don't save to file
 	}
@@ -257,17 +256,14 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 	success, ok := resp.S("success").Data().(bool)
 	if !ok {
-		fmt.Println("[updateRecord] Error decoding response. ", resp)
 		log.WithFields(log.Fields{"resp": resp}).Error("[updateRecord] Error decoding response")
 	}
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
-		fmt.Printf("Failed to update the record: %s", errorMessage)
 		log.WithFields(log.Fields{"errorMessage": errorMessage}).Error("[updateRecord] Failed to update the record")
 		return
 	}
-	fmt.Printf("%s%s record changed successfully%s\n", color.Green, recordType, color.Reset)
 	log.WithFields(log.Fields{"recordType": recordType}).Info("record changed successfully")
 }
 
@@ -297,11 +293,9 @@ func createRecord(recordType string, IP string) {
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
-		fmt.Println("[createRecord] Failed to create record: ", errorMessage)
 		log.WithFields(log.Fields{"errorMessage": errorMessage}).Info("[createRecord] Failed to create record")
 		return
 	}
-	fmt.Printf("%s%s record created successfully%s\n", color.Green, recordType, color.Reset)
 	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
 }
 
@@ -337,7 +331,7 @@ func updateIP(IPversion string) {
 	}
 
 	if err != nil {
-		log.Error("%sError getting the domain's %s%s%s record: %s%s\n%sdomainIP:%s %s\n%srecordID:%s %s\n", color.Red, color.Reset, recordType, color.Red, color.Reset, err, color.Red, color.Reset, domainIP, color.Red, color.Reset, recordID)
+		log.WithFields(log.Fields{"err": err, "recordType": recordType, "domainIP": domainIP, "recordID": recordID}).Info("[updateIP] Error getting the domain's record")
 		return
 	}
 
@@ -388,7 +382,7 @@ func main() {
 	}
 
 	if Config.SubDomainToUpdate == "" {
-		log.Printf("WARNING: No Subdomain Specified. Using root domain (%s)\n", Config.Domain)
+		log.Warnf("No Subdomain Specified. Using root domain (%s)\n", Config.Domain)
 	}
 
 	if Config.DisableIPv4 && Config.DisableIPv6 {
@@ -396,7 +390,7 @@ func main() {
 	}
 
 	fmt.Printf("%s[%s%s%s] Checking %s%s\n", color.Cyan, color.Reset, time.Now().Format(time.RFC3339), color.Cyan, color.Reset, Config.Name)
-
+	log.Printf("Checking %s", Config.Name)
 	httpClient = &http.Client{}
 
 	if !Config.DisableIPv4 {
