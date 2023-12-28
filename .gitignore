@@ -4,4 +4,4 @@ bin/
 .vscode
 .vscode/*
 *.log
-notifyScript.sh
+*.sh
