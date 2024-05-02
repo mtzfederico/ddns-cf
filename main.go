@@ -88,7 +88,7 @@ func runUpdateScript(IPversion string, OldIP string, NewIP string) {
 		log.WithFields(log.Fields{"IPversion": IPversion, "out": out, "err": err}).Error("[runUpdateScript] Error from script")
 		return
 	}
-	log.WithFields(log.Fields{"IPversion": IPversion, "out": out}).Info("[runUpdateScript] Script ran")
+	log.WithFields(log.Fields{"IPversion": IPversion, "out": string(out)}).Info("[runUpdateScript] Script ran")
 }
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
