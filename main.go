@@ -113,6 +113,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	req.Header.Set("X-Auth-Key", Config.APIKey)
 	req.Header.Set("X-Auth-Email", Config.Email)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "ddns-cf/1.0 (github.com/mtzfederico/ddns-cf)")
 
 	resp, err := httpClient.Do(req)
 
@@ -142,17 +143,24 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 func getIP(ipVersion string) string {
 	url := fmt.Sprintf("https://ip%s.icanhazip.com", ipVersion)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "ipVersion": ipVersion}).Fatal("[getIP] Error creating request")
+	}
+
+	req.Header.Set("User-Agent", "ddns-cf/1.0 (github.com/mtzfederico/ddns-cf)")
+
+	resp, err := httpClient.Do(req)
 
 	if err != nil {
-		// log.Fatalf("An Error Occured %v", err)
+		log.WithFields(log.Fields{"error": err, "ipVersion": ipVersion}).Fatal("[getIP] Error sending request")
 		return ""
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		log.WithFields(log.Fields{"error": err, "resp": resp}).Fatal("[getIP] Error processing response")
 	}
 	return strings.TrimSuffix(string(body), "\n")
 }
