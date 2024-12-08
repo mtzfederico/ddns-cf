@@ -6,3 +6,5 @@ build:
 update:
 	git pull
 	go build -o bin/ddns-cf
+dev:
+	go build -o bin/ddns-cf-dev
