@@ -5,3 +5,4 @@ bin/
 .vscode/*
 *.log
 *.sh
+_ignore_*
