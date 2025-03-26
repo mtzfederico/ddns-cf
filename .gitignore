@@ -6,3 +6,4 @@ bin/
 *.log
 *.sh
 _ignore_*
+*.ignore
