@@ -314,7 +314,7 @@ func updateIP(IPversion string) {
 	} else if IPversion == "v6" {
 		recordType = "AAAA"
 	} else {
-		log.Error("Invalid IP Version.", IPversion)
+		log.WithField("IPversion", IPversion).Error("[updateIP] Invalid IP Version")
 		return
 	}
 
@@ -360,17 +360,17 @@ func main() {
 	Config.get(*configPath)
 
 	// If the file doesn't exist, create it, otherwise append to the file
-	file, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	logFile, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		log.WithField("Error", err).Fatal("Logging file error")
+		log.WithFields(log.Fields{"error": err, "logFilePath": Config.LogFile}).Error("[main] Failed to open log file. Using stderr instead")
+	} else {
+		log.SetOutput(logFile)
 	}
-
-	log.SetOutput(file)
 
 	if Config.DebugLevel != "" {
 		level, err := log.ParseLevel(Config.DebugLevel)
 		if err != nil {
-			log.Error("DebugLevel has an invalid value")
+			log.WithFields(log.Fields{"error": err, "DebugLevel": Config.DebugLevel}).Error("[main] DebugLevel has an invalid value")
 		} else {
 			log.Info("Log Level set to ", Config.DebugLevel)
 			log.SetLevel(level)
@@ -414,4 +414,3 @@ func main() {
 // Todo:
 // * Add/create domain/record if it doesn't exist
 // * Create install script that compiles and creates systemd timer
-// * Upload to github
