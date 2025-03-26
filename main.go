@@ -289,23 +289,35 @@ func updateIP(IPversion string) {
 		log.WithFields(log.Fields{"Version": IPversion, "from": domainIP, "to": IP}).Info("IP address changed")
 		updateRecord(recordID, recordType, IP)
 		runUpdateScript(IPversion, domainIP, IP)
-	} else {
-		fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
-		log.WithFields(log.Fields{"Version": IPversion, "ip": IP}).Info("IP address has not changed")
+		return
 	}
+
+	fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
+	log.WithFields(log.Fields{"Version": IPversion, "ip": IP}).Info("IP address has not changed")
 }
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "Path to the configuration file")
 	flag.Parse()
+
+	if *configPath == "" {
+		log.Fatal("[main] config flag missing. use --config path/to/config.yaml")
+		return
+	}
+
 	Config.get(*configPath)
 
-	// If the file doesn't exist, create it, otherwise append to the file
-	logFile, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.WithFields(log.Fields{"error": err, "logFilePath": Config.LogFile}).Error("[main] Failed to open log file. Using stderr instead")
+	if Config.LogFile != "" {
+		// If the file doesn't exist, create it, otherwise append to the file
+		file, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			log.WithFields(log.Fields{"error": err, "logFilePath": Config.LogFile}).Error("[main] Failed to open log file. Using stderr instead")
+		} else {
+			log.SetOutput(file)
+		}
 	} else {
-		log.SetOutput(logFile)
+		// This should never happen since the config sets a default log path
+		log.Warn("[main] No LogFile specified. Logging to stderr")
 	}
 
 	if Config.DebugLevel != "" {
@@ -345,6 +357,7 @@ func main() {
 	if !Config.DisableIPv4 {
 		updateIP("v4")
 	}
+
 	if !Config.DisableIPv6 {
 		updateIP("v6")
 	}
@@ -353,5 +366,4 @@ func main() {
 }
 
 // Todo:
-// * Add/create domain/record if it doesn't exist
 // * Create install script that compiles and creates systemd timer
