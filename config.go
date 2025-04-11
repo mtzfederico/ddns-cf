@@ -18,7 +18,7 @@ type conf struct {
 	APIKey            string `yaml:"APIKey" binding:"required"`
 	Email             string `yaml:"Email" binding:"required"`
 	RecordTTL         int    `yaml:"RecordTTL"`
-	IsProxied         bool   `yaml:"IsProxied" binding:"required"`
+	IsProxied         bool   `yaml:"IsProxied"`
 	DisableIPv4       bool   `yaml:"DisableIPv4"`
 	DisableIPv6       bool   `yaml:"DisableIPv6"`
 	Verbose           bool   `yaml:"Verbose"`
@@ -47,6 +47,10 @@ func (c *conf) get(configPath string) *conf {
 	if c.LogFile == "" {
 		c.LogFile = "/var/log/ddns-cf/ddns-cf.log"
 		fmt.Println("[WARNING] Using default logging path (/var/log/ddns-cf/ddns-cf.log)")
+	}
+
+	if c.Verbose {
+		fmt.Printf("Config: Domain: %s, SubDomainToUpdate. %s, APIKey: %s, Email: %s, RecordTTL: %d, IsProxied: %t, DisableIPv4: %t, DisableIPv6: %t, Verbose: %t, ScriptOnChange: %s, LogFile: %s, DebugLevel: %s\n", c.Domain, c.SubDomainToUpdate, c.APIKey, c.Email, c.RecordTTL, c.IsProxied, c.DisableIPv4, c.DisableIPv6, c.Verbose, c.ScriptOnChange, c.LogFile, c.DebugLevel)
 	}
 
 	return c
