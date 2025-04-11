@@ -191,11 +191,10 @@ func updateRecord(recordID string, recordType string, IP string) {
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
 	}
-	name := Config.Name
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = name
+	requestBody.Name = Config.Name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
 	requestBody.Proxied = Config.IsProxied

@@ -10,21 +10,21 @@ import (
 )
 
 type conf struct {
-	// Complete FQDN to update
+	// Complete FQDN to update. Set by the program.
 	Name              string
 	Domain            string `yaml:"Domain" binding:"required"`
 	DomainZoneID      string `yaml:"DomainZoneID"`
 	SubDomainToUpdate string `yaml:"SubDomainToUpdate"`
 	APIKey            string `yaml:"APIKey" binding:"required"`
 	Email             string `yaml:"Email" binding:"required"`
-	RecordTTL         int    `yaml:"RecordTTL" binding:"required"`
+	RecordTTL         int    `yaml:"RecordTTL"`
 	IsProxied         bool   `yaml:"IsProxied" binding:"required"`
 	DisableIPv4       bool   `yaml:"DisableIPv4"`
 	DisableIPv6       bool   `yaml:"DisableIPv6"`
 	Verbose           bool   `yaml:"Verbose"`
 	ScriptOnChange    string `yaml:"ScriptOnChange"`
-	LogFile           string `yaml:"LogFile" binding:"required"`
-	DebugLevel        string `yaml:"DebugLevel" binding:"required"`
+	LogFile           string `yaml:"LogFile"`
+	DebugLevel        string `yaml:"DebugLevel"`
 }
 
 func (c *conf) get(configPath string) *conf {

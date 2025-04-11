@@ -1,7 +1,7 @@
 # https://opensource.com/article/20/7/systemd-timers
 # https://wiki.archlinux.org/title/Systemd/Timers
-# Save in /etc/systemd/system then enable and start the timer
-# Serice called by a timer
+# Save in /etc/systemd/system/ddns-cf.service then enable and start the timer
+# Service called by a timer
 
 [Unit]
 Description=DDNS-CF script

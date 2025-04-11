@@ -1,4 +1,4 @@
-# Save in /etc/systemd/system then enable and start the timer
+# Save in /etc/systemd/system/ddns-cf.timer then enable and start the timer
 
 [Unit]
 Description=DDNS-CF script
@@ -6,7 +6,6 @@ Requires=ddns-cf.service
 
 [Timer]
 Unit=ddns-cf.service
-## Used to run 11 minutes after boot and every 33 minutes after that
 OnBootSec=3min
 OnUnitActiveSec=12min
 
