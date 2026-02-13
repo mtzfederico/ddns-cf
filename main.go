@@ -130,9 +130,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 		Config.DomainZoneID = zoneID // save for later use but don't save to file
 	}
 
-	name := Config.Name
-
-	path := fmt.Sprintf("zones/%s/dns_records?type=%s&name=%s", zoneID, recordType, name)
+	path := fmt.Sprintf("zones/%s/dns_records?type=%s&name=%s", zoneID, recordType, Config._Name)
 	resp := sendRequest(path, "GET", nil)
 
 	success, ok := resp.Path("success").Data().(bool)
@@ -159,7 +157,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 
 	// the subdomain exists but there is no record for this type. There is an A record but no AAAA record or vice versa.
 	if resultLen == 0 {
-		return "", "", fmt.Errorf("no record of type %s for %s", recordType, name)
+		return "", "", fmt.Errorf("no record of type %s for %s", recordType, Config._Name)
 	}
 
 	content, ok := result.Index(0).Path("content").Data().(string) // The record's value
@@ -168,7 +166,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	}
 
 	if content == "" {
-		return content, "", fmt.Errorf("no Content for %s's %s record", name, recordType)
+		return content, "", fmt.Errorf("no Content for %s's %s record", Config._Name, recordType)
 
 	}
 
@@ -178,7 +176,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	}
 
 	if RecordID == "" {
-		return content, "", fmt.Errorf("no recordID for %s's %s record", name, recordType)
+		return content, "", fmt.Errorf("no recordID for %s's %s record", Config._Name, recordType)
 	}
 
 	return content, RecordID, nil
@@ -194,7 +192,7 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = Config.Name
+	requestBody.Name = Config._Name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
 	requestBody.Proxied = Config.IsProxied
@@ -222,11 +220,10 @@ func createRecord(recordType string, IP string) {
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
 	}
-	name := Config.Name
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = name
+	requestBody.Name = Config._Name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
 	requestBody.Proxied = Config.IsProxied
@@ -345,8 +342,8 @@ func main() {
 		log.Fatal("IPv4 and IPv6 can't be disabled at the same time")
 	}
 
-	fmt.Printf("%s[%s%s%s] Checking %s%s\n", color.Cyan, color.Reset, time.Now().Format(time.RFC3339), color.Cyan, color.Reset, Config.Name)
-	log.Printf("Checking %s", Config.Name)
+	// fmt.Printf("%s[%s%s%s] Checking %s%s\n", color.Cyan, color.Reset, time.Now().Format(time.RFC3339), color.Cyan, color.Reset, Config.Name)
+	// log.Printf("Checking %s", Config._Name)
 	httpClient = &http.Client{}
 
 	if !Config.DisableIPv4 {

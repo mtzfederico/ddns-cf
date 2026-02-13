@@ -11,7 +11,7 @@ import (
 
 type conf struct {
 	// Complete FQDN to update. Set by the program.
-	Name              string
+	_Name             string
 	Domain            string `yaml:"Domain" binding:"required"`
 	DomainZoneID      string `yaml:"DomainZoneID"`
 	SubDomainToUpdate string `yaml:"SubDomainToUpdate"`
@@ -37,11 +37,11 @@ func (c *conf) get(configPath string) *conf {
 		log.Fatalf("Unmarshal: %v", err)
 	}
 
-	c.Name = ""
+	c._Name = ""
 	if c.SubDomainToUpdate == "" {
-		c.Name = c.Domain
+		c._Name = c.Domain
 	} else {
-		c.Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
+		c._Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
 	}
 
 	if c.LogFile == "" {
