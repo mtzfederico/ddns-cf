@@ -243,11 +243,12 @@ func createRecord(recordType string, IP string) {
 
 func updateIP(IPversion string) {
 	recordType := ""
-	if IPversion == "v4" {
+	switch IPversion {
+	case "v4":
 		recordType = "A"
-	} else if IPversion == "v6" {
+	case "v6":
 		recordType = "AAAA"
-	} else {
+	default:
 		log.WithField("IPversion", IPversion).Error("[updateIP] Invalid IP Version")
 		return
 	}
