@@ -51,10 +51,10 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 		log.Fatal("Error creating Request: ", err)
 	}
 
-	req.Header.Set("X-Auth-Key", Config.APIKey)
-	req.Header.Set("X-Auth-Email", Config.Email)
+	cfAuthHeader := fmt.Sprintf("Bearer %s", Config.APIKey)
+	req.Header.Set("Authorization", cfAuthHeader)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "ddns-cf/1.0 (github.com/mtzfederico/ddns-cf)")
+	req.Header.Set("User-Agent", "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)")
 
 	resp, err := httpClient.Do(req)
 
@@ -331,10 +331,6 @@ func main() {
 
 	if Config.APIKey == "" {
 		log.Fatal("No APIkey found in config.yaml")
-	}
-
-	if Config.Email == "" {
-		log.Fatal("No Email found in config.yaml")
 	}
 
 	if Config.Domain == "" {

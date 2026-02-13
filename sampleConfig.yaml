@@ -2,7 +2,6 @@ Domain: "<domain.tld>"
 DomainZoneID: "<DomainZoneID>"
 SubDomainToUpdate: "<subdomain>" # Leave empty (or removed) to modify the domain's root
 APIKey: "<Your API Key>"
-Email: "<Your CloudFlare account's email address>"
 DisableIPv4: false
 DisableIPv6: false
 ScriptOnChange: "myScript.sh" # IPversion, OldIP, NewIP. IP Version ("v4" or "v6"). It is called once per IP version changed

@@ -16,7 +16,6 @@ type conf struct {
 	DomainZoneID      string `yaml:"DomainZoneID"`
 	SubDomainToUpdate string `yaml:"SubDomainToUpdate"`
 	APIKey            string `yaml:"APIKey" binding:"required"`
-	Email             string `yaml:"Email" binding:"required"`
 	RecordTTL         int    `yaml:"RecordTTL"`
 	IsProxied         bool   `yaml:"IsProxied"`
 	DisableIPv4       bool   `yaml:"DisableIPv4"`
