@@ -47,8 +47,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 		log.Fatal("Error creating Request: ", err)
 	}
 
-	cfAuthHeader := fmt.Sprintf("Bearer %s", Config.APIKey)
-	req.Header.Set("Authorization", cfAuthHeader)
+	req.Header.Set("Authorization", "Bearer "+Config.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)")
 
@@ -65,12 +64,12 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	}
 
 	// fmt.Printf("%s%s%s", color.Ize(color.Blue, "----- Response Starts -----\n"), string(body), color.Ize(color.Blue, "\n----- Response Ends -----\n"))
-	log.WithFields(log.Fields{"responseBody": body}).Trace(("[sendRequest] Received response"))
+	log.WithFields(log.Fields{"responseBody": string(body)}).Trace(("[sendRequest] Received response"))
 
 	jsonParsed, err := gabs.ParseJSON(body)
 
 	if err != nil {
-		log.WithFields(log.Fields{"path": path, "method": method, "responseBody": body}).Fatal(("[sendRequest] Failed to parse JSON"))
+		log.WithFields(log.Fields{"path": path, "method": method, "responseBody": string(body)}).Fatal(("[sendRequest] Failed to parse JSON"))
 	}
 
 	return jsonParsed
