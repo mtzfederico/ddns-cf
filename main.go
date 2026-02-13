@@ -37,7 +37,7 @@ type RecordData struct {
 }
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
-	url := fmt.Sprintf("%s%s", baseURL, path)
+	url := baseURL + path
 	// fmt.Printf("%s%s %s%s\n", color.Yellow, method, url, color.Reset)
 	log.WithFields(log.Fields{"method": method, "url": url}).Trace(("[sendRequest] Sending request"))
 
@@ -83,7 +83,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 }
 
 func getIP(ipVersion IPVersion) string {
-	url := fmt.Sprintf("https://ip%s.icanhazip.com", ipVersion)
+	url := "https://ip" + string(ipVersion) + ".icanhazip.com"
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -110,7 +110,7 @@ func getIP(ipVersion IPVersion) string {
 func getZoneID() string {
 	// Get domain's zone id. data.result[0].id
 	// https://api.cloudflare.com/#zone-list-zones
-	url := fmt.Sprintf("zones?name=%s", Config.Domain)
+	url := "zones?name=%s" + Config.Domain
 	resp := sendRequest(url, "GET", nil)
 	zoneID, ok := resp.S("result").Index(0).Path("id").Data().(string)
 	if !ok {
@@ -131,8 +131,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 		zoneID = getZoneID()
 		Config.DomainZoneID = zoneID // save for later use but don't save to file
 	}
-
-	path := fmt.Sprintf("zones/%s/dns_records?type=%s&name=%s", zoneID, recordType, Config._Name)
+	path := "zones/" + zoneID + "/dns_records?type=" + recordType + "&name=" + Config._Name
 	resp := sendRequest(path, "GET", nil)
 
 	success, ok := resp.Path("success").Data().(bool)
@@ -187,7 +186,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 
 func updateRecord(recordID string, recordType string, IP string) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-update-dns-record
-	path := fmt.Sprintf("zones/%s/dns_records/%s", Config.DomainZoneID, recordID)
+	path := "zones/" + Config.DomainZoneID + "/dns_records/" + recordID
 	ttl := Config.RecordTTL
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
@@ -218,7 +217,7 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 func createRecord(recordType string, IP string) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
-	path := fmt.Sprintf("zones/%s/dns_records", Config.DomainZoneID)
+	path := "zones/" + Config.DomainZoneID + "/dns_records"
 	ttl := Config.RecordTTL
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
