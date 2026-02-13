@@ -23,7 +23,8 @@ type conf struct {
 	Verbose           bool   `yaml:"Verbose"`
 	ScriptOnChange    string `yaml:"ScriptOnChange"`
 	LogFile           string `yaml:"LogFile"`
-	DebugLevel        string `yaml:"DebugLevel"`
+	// The level of details to log. The options from less detail to very detailed are: panic, fatal, error, warning, info, debug, and trace
+	LogLevel string `yaml:"LogLevel"`
 }
 
 func (c *conf) get(configPath string) *conf {
