@@ -8,14 +8,14 @@ import (
 
 // Runs the script specified in the config file (if any) when an IP changes.
 // The arguments are: IPversion, OldIP, NewIP, Updated FQDN
-func runUpdateScript(IPversion string, OldIP string, NewIP string) {
+func runUpdateScript(IPversion IPVersion, OldIP string, NewIP string) {
 	scriptPath := Config.ScriptOnChange
 	if scriptPath == "" {
 		log.Info("[runUpdateScript] No script found")
 		return
 	}
 
-	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config._Name).Output()
+	out, err := exec.Command(scriptPath, string(IPversion), OldIP, NewIP, Config._Name).Output()
 	if err != nil {
 		log.WithFields(log.Fields{"IPversion": IPversion, "out": out, "err": err}).Error("[runUpdateScript] Error from script")
 		return

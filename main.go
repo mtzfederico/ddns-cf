@@ -14,8 +14,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// An IP Version
+//
+// The value is used to form the URL to get the device's public IP.
+type IPVersion string
+
 const (
-	baseURL = "https://api.cloudflare.com/client/v4/"
+	baseURL           = "https://api.cloudflare.com/client/v4/"
+	IPv4    IPVersion = "v4"
+	IPv6    IPVersion = "v6"
 )
 
 var Config conf
@@ -75,7 +82,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	return jsonParsed
 }
 
-func getIP(ipVersion string) string {
+func getIP(ipVersion IPVersion) string {
 	url := fmt.Sprintf("https://ip%s.icanhazip.com", ipVersion)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -240,12 +247,12 @@ func createRecord(recordType string, IP string) {
 	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
 }
 
-func updateIP(IPversion string) {
+func updateIP(IPversion IPVersion) {
 	recordType := ""
 	switch IPversion {
-	case "v4":
+	case IPv4:
 		recordType = "A"
-	case "v6":
+	case IPv6:
 		recordType = "AAAA"
 	default:
 		log.WithField("IPversion", IPversion).Error("[updateIP] Invalid IP Version")
@@ -333,11 +340,11 @@ func main() {
 	httpClient = &http.Client{}
 
 	if !Config.DisableIPv4 {
-		updateIP("v4")
+		updateIP(IPv4)
 	}
 
 	if !Config.DisableIPv6 {
-		updateIP("v6")
+		updateIP(IPv6)
 	}
 
 	httpClient.CloseIdleConnections()
