@@ -15,7 +15,7 @@ func runUpdateScript(IPversion string, OldIP string, NewIP string) {
 		return
 	}
 
-	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config.Name).Output()
+	out, err := exec.Command(scriptPath, IPversion, OldIP, NewIP, Config._Name).Output()
 	if err != nil {
 		log.WithFields(log.Fields{"IPversion": IPversion, "out": out, "err": err}).Error("[runUpdateScript] Error from script")
 		return
