@@ -8,12 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/Jeffail/gabs"
-	"github.com/TwiN/go-color"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -34,9 +31,8 @@ type RecordData struct {
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
 	url := fmt.Sprintf("%s%s", baseURL, path)
-	if Config.Verbose {
-		fmt.Printf("%s%s %s%s\n", color.Yellow, method, url, color.Reset)
-	}
+	// fmt.Printf("%s%s %s%s\n", color.Yellow, method, url, color.Reset)
+	log.WithFields(log.Fields{"method": method, "url": url}).Trace(("[sendRequest] Sending request"))
 
 	var req *http.Request
 	var err error
@@ -68,9 +64,8 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 		log.Fatalln(err)
 	}
 
-	if Config.Verbose {
-		fmt.Printf("%s%s%s", color.Ize(color.Blue, "----- Response Starts -----\n"), string(body), color.Ize(color.Blue, "\n----- Response Ends -----\n"))
-	}
+	// fmt.Printf("%s%s%s", color.Ize(color.Blue, "----- Response Starts -----\n"), string(body), color.Ize(color.Blue, "\n----- Response Ends -----\n"))
+	log.WithFields(log.Fields{"responseBody": body}).Trace(("[sendRequest] Received response"))
 
 	jsonParsed, err := gabs.ParseJSON(body)
 
@@ -115,6 +110,7 @@ func getZoneID() string {
 	if !ok {
 		log.WithFields(log.Fields{"resp": resp}).Error("[getZoneID] Error decoding zoneID")
 	}
+	log.WithFields(log.Fields{"zoneID": zoneID}).Debug("[getZoneID] Got zoneID from CF")
 	return zoneID
 }
 
@@ -140,6 +136,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	}
 
 	if !success {
+		log.WithFields(log.Fields{"resp": resp}).Error("[getCurrentValue] API call failed")
 		error := resp.S("errors").Index(0)
 		errorCode := error.Path("code").Data().(string)
 		if errorCode == "7003" {
@@ -259,7 +256,7 @@ func updateIP(IPversion string) {
 	IP := getIP(IPversion)
 
 	if IP == "" {
-		fmt.Printf("%sNo IP%s address found%s\n", color.Red, IPversion, color.Red)
+		// fmt.Printf("%sNo IP%s address found%s\n", color.Red, IPversion, color.Red)
 		log.WithFields(log.Fields{"Version": IPversion}).Info("No IP address found")
 		return
 	}
@@ -268,7 +265,7 @@ func updateIP(IPversion string) {
 
 	if err != nil && domainIP == "" && recordID == "" {
 		// create the record
-		fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
+		// fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
 		log.WithFields(log.Fields{"Version": IPversion, "IP": IP}).Info("IP address detected for the first time")
 		createRecord(recordType, IP)
 		runUpdateScript(IPversion, domainIP, IP)
@@ -281,14 +278,14 @@ func updateIP(IPversion string) {
 	}
 
 	if domainIP != IP {
-		fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
+		// fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
 		log.WithFields(log.Fields{"Version": IPversion, "from": domainIP, "to": IP}).Info("IP address changed")
 		updateRecord(recordID, recordType, IP)
 		runUpdateScript(IPversion, domainIP, IP)
 		return
 	}
 
-	fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
+	// fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
 	log.WithFields(log.Fields{"Version": IPversion, "ip": IP}).Info("IP address has not changed")
 }
 
@@ -303,25 +300,14 @@ func main() {
 
 	Config.get(*configPath)
 
-	if Config.LogFile != "" {
-		// If the file doesn't exist, create it, otherwise append to the file
-		file, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		if err != nil {
-			log.WithFields(log.Fields{"error": err, "logFilePath": Config.LogFile}).Error("[main] Failed to open log file. Using stderr instead")
-		} else {
-			log.SetOutput(file)
-		}
-	} else {
-		// This should never happen since the config sets a default log path
-		log.Warn("[main] No LogFile specified. Logging to stderr")
-	}
+	setupLogOutput()
 
-	if Config.DebugLevel != "" {
-		level, err := log.ParseLevel(Config.DebugLevel)
+	if Config.LogLevel != "" {
+		level, err := log.ParseLevel(Config.LogLevel)
 		if err != nil {
-			log.WithFields(log.Fields{"error": err, "DebugLevel": Config.DebugLevel}).Error("[main] DebugLevel has an invalid value")
+			log.WithFields(log.Fields{"error": err, "DebugLevel": Config.LogLevel}).Error("[main] LogLevel has an invalid value")
 		} else {
-			log.Info("Log Level set to ", Config.DebugLevel)
+			log.Debug("Log Level set to ", Config.LogLevel)
 			log.SetLevel(level)
 		}
 	}

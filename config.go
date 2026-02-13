@@ -20,7 +20,6 @@ type conf struct {
 	IsProxied         bool   `yaml:"IsProxied"`
 	DisableIPv4       bool   `yaml:"DisableIPv4"`
 	DisableIPv6       bool   `yaml:"DisableIPv6"`
-	Verbose           bool   `yaml:"Verbose"`
 	ScriptOnChange    string `yaml:"ScriptOnChange"`
 	LogFile           string `yaml:"LogFile"`
 	// The level of details to log. The options from less detail to very detailed are: panic, fatal, error, warning, info, debug, and trace
@@ -44,14 +43,29 @@ func (c *conf) get(configPath string) *conf {
 		c._Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
 	}
 
-	if c.LogFile == "" {
-		c.LogFile = "/var/log/ddns-cf/ddns-cf.log"
-		fmt.Println("[WARNING] Using default logging path (/var/log/ddns-cf/ddns-cf.log)")
-	}
-
-	if c.Verbose {
-		fmt.Printf("Config: Domain: %s, SubDomainToUpdate. %s, APIKey: %s, Email: %s, RecordTTL: %d, IsProxied: %t, DisableIPv4: %t, DisableIPv6: %t, Verbose: %t, ScriptOnChange: %s, LogFile: %s, DebugLevel: %s\n", c.Domain, c.SubDomainToUpdate, c.APIKey, c.Email, c.RecordTTL, c.IsProxied, c.DisableIPv4, c.DisableIPv6, c.Verbose, c.ScriptOnChange, c.LogFile, c.DebugLevel)
-	}
+	log.WithFields(log.Fields{"Domain": Config.Domain, "SubDomainToUpdate": Config.SubDomainToUpdate, "APIKey": Config.APIKey, "RecordTTL": Config.RecordTTL, "IsProxied": Config.IsProxied, "DisableIPv4": Config.DisableIPv4, "DisableIPv6": Config.DisableIPv6, "ScriptOnChange": Config.ScriptOnChange, "LogFile": Config.LogFile, "LogLevel": Config.LogLevel}).Trace("Config options")
 
 	return c
+}
+
+func setupLogOutput() {
+	if Config.LogFile == "" {
+		log.Info("[setupLogOutput] No LogFile specified. Logging to stderr")
+		// https://pkg.go.dev/github.com/sirupsen/logrus#New
+		return
+	}
+
+	if Config.LogFile == "stdout" {
+		log.SetOutput(os.Stdout)
+		return
+	}
+
+	// If the file doesn't exist, create it, otherwise append to the file
+	file, err := os.OpenFile(Config.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.WithFields(log.Fields{"error": err, "logFilePath": Config.LogFile}).Error("[setupLogOutput] Failed to open log file. Using stderr instead")
+		return
+	}
+
+	log.SetOutput(file)
 }
