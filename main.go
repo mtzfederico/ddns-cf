@@ -25,7 +25,7 @@ const (
 	IPv6    IPVersion = "v6"
 )
 
-var Config conf
+var conf Config
 var httpClient *http.Client
 
 type RecordData struct {
@@ -54,7 +54,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 		log.Fatal("Error creating Request: ", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+Config.APIKey)
+	req.Header.Set("Authorization", "Bearer "+conf.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)")
 
@@ -110,7 +110,7 @@ func getIP(ipVersion IPVersion) string {
 func getZoneID() string {
 	// Get domain's zone id. data.result[0].id
 	// https://api.cloudflare.com/#zone-list-zones
-	url := "zones?name=%s" + Config.Domain
+	url := "zones?name=%s" + conf.Domain
 	resp := sendRequest(url, "GET", nil)
 	zoneID, ok := resp.S("result").Index(0).Path("id").Data().(string)
 	if !ok {
@@ -124,14 +124,14 @@ func getZoneID() string {
 func getCurrentValue(recordType string) (string, string, error) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-list-dns-records
 	// name is the FQDN. 'subdomain.domain.tld' or 'domain.tld'
-	zoneID := Config.DomainZoneID
+	zoneID := conf.DomainZoneID
 
 	if zoneID == "" {
 		log.Info("ZoneID not in config file, fetching from CF.")
 		zoneID = getZoneID()
-		Config.DomainZoneID = zoneID // save for later use but don't save to file
+		conf.DomainZoneID = zoneID // save for later use but don't save to file
 	}
-	path := "zones/" + zoneID + "/dns_records?type=" + recordType + "&name=" + Config._Name
+	path := "zones/" + zoneID + "/dns_records?type=" + recordType + "&name=" + conf._Name
 	resp := sendRequest(path, "GET", nil)
 
 	success, ok := resp.Path("success").Data().(bool)
@@ -159,7 +159,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 
 	// the subdomain exists but there is no record for this type. There is an A record but no AAAA record or vice versa.
 	if resultLen == 0 {
-		return "", "", fmt.Errorf("no record of type %s for %s", recordType, Config._Name)
+		return "", "", fmt.Errorf("no record of type %s for %s", recordType, conf._Name)
 	}
 
 	content, ok := result.Index(0).Path("content").Data().(string) // The record's value
@@ -168,7 +168,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	}
 
 	if content == "" {
-		return content, "", fmt.Errorf("no Content for %s's %s record", Config._Name, recordType)
+		return content, "", fmt.Errorf("no Content for %s's %s record", conf._Name, recordType)
 
 	}
 
@@ -178,7 +178,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	}
 
 	if RecordID == "" {
-		return content, "", fmt.Errorf("no recordID for %s's %s record", Config._Name, recordType)
+		return content, "", fmt.Errorf("no recordID for %s's %s record", conf._Name, recordType)
 	}
 
 	return content, RecordID, nil
@@ -186,18 +186,18 @@ func getCurrentValue(recordType string) (string, string, error) {
 
 func updateRecord(recordID string, recordType string, IP string) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-update-dns-record
-	path := "zones/" + Config.DomainZoneID + "/dns_records/" + recordID
-	ttl := Config.RecordTTL
+	path := "zones/" + conf.DomainZoneID + "/dns_records/" + recordID
+	ttl := conf.RecordTTL
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
 	}
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = Config._Name
+	requestBody.Name = conf._Name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
-	requestBody.Proxied = Config.IsProxied
+	requestBody.Proxied = conf.IsProxied
 
 	requestData, _ := json.Marshal((requestBody))
 	resp := sendRequest(path, "PUT", requestData)
@@ -217,18 +217,18 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 func createRecord(recordType string, IP string) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
-	path := "zones/" + Config.DomainZoneID + "/dns_records"
-	ttl := Config.RecordTTL
+	path := "zones/" + conf.DomainZoneID + "/dns_records"
+	ttl := conf.RecordTTL
 	if ttl == 0 {
 		ttl = 1 // 1 is Automatic
 	}
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = Config._Name
+	requestBody.Name = conf._Name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
-	requestBody.Proxied = Config.IsProxied
+	requestBody.Proxied = conf.IsProxied
 
 	requestData, _ := json.Marshal((requestBody))
 	resp := sendRequest(path, "POST", requestData)
@@ -304,33 +304,33 @@ func main() {
 		return
 	}
 
-	Config.get(*configPath)
+	conf.get(*configPath)
 
 	setupLogOutput()
 
-	if Config.LogLevel != "" {
-		level, err := log.ParseLevel(Config.LogLevel)
+	if conf.LogLevel != "" {
+		level, err := log.ParseLevel(conf.LogLevel)
 		if err != nil {
-			log.WithFields(log.Fields{"error": err, "DebugLevel": Config.LogLevel}).Error("[main] LogLevel has an invalid value")
+			log.WithFields(log.Fields{"error": err, "DebugLevel": conf.LogLevel}).Error("[main] LogLevel has an invalid value")
 		} else {
-			log.Debug("Log Level set to ", Config.LogLevel)
+			log.Debug("Log Level set to ", conf.LogLevel)
 			log.SetLevel(level)
 		}
 	}
 
-	if Config.APIKey == "" {
+	if conf.APIKey == "" {
 		log.Fatal("No APIkey found in config.yaml")
 	}
 
-	if Config.Domain == "" {
+	if conf.Domain == "" {
 		log.Fatal("No Domain found in config.yaml")
 	}
 
-	if Config.SubDomainToUpdate == "" {
-		log.Warnf("No Subdomain Specified. Using root domain (%s)\n", Config.Domain)
+	if conf.SubDomainToUpdate == "" {
+		log.Warnf("No Subdomain Specified. Using root domain (%s)\n", conf.Domain)
 	}
 
-	if Config.DisableIPv4 && Config.DisableIPv6 {
+	if conf.DisableIPv4 && conf.DisableIPv6 {
 		log.Fatal("IPv4 and IPv6 can't be disabled at the same time")
 	}
 
@@ -338,11 +338,11 @@ func main() {
 	// log.Printf("Checking %s", Config._Name)
 	httpClient = &http.Client{}
 
-	if !Config.DisableIPv4 {
+	if !conf.DisableIPv4 {
 		updateIP(IPv4)
 	}
 
-	if !Config.DisableIPv6 {
+	if !conf.DisableIPv6 {
 		updateIP(IPv6)
 	}
 
