@@ -32,9 +32,10 @@ func (version IPVersion) getRecordType() string {
 }
 
 const (
-	baseURL           = "https://api.cloudflare.com/client/v4/"
-	IPv4    IPVersion = "v4"
-	IPv6    IPVersion = "v6"
+	baseURL   string    = "https://api.cloudflare.com/client/v4/"
+	IPv4      IPVersion = "v4"
+	IPv6      IPVersion = "v6"
+	UserAgent string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
 )
 
 var conf Config
@@ -68,7 +69,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 
 	req.Header.Set("Authorization", "Bearer "+conf.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)")
+	req.Header.Set("User-Agent", UserAgent)
 
 	resp, err := httpClient.Do(req)
 
@@ -102,7 +103,7 @@ func getIP(ipVersion IPVersion) string {
 		log.WithFields(log.Fields{"error": err, "ipVersion": ipVersion}).Fatal("[getIP] Error creating request")
 	}
 
-	req.Header.Set("User-Agent", "ddns-cf/1.0 (github.com/mtzfederico/ddns-cf)")
+	req.Header.Set("User-Agent", UserAgent)
 
 	resp, err := httpClient.Do(req)
 
