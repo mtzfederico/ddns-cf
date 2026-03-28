@@ -19,6 +19,17 @@ import (
 // The value is used to form the URL to get the device's public IP.
 type IPVersion string
 
+func (version IPVersion) getRecordType() string {
+	switch version {
+	case IPv4:
+		return "A"
+	case IPv6:
+		return "AAAA"
+	default:
+		return ""
+	}
+}
+
 const (
 	baseURL           = "https://api.cloudflare.com/client/v4/"
 	IPv4    IPVersion = "v4"
@@ -246,15 +257,10 @@ func createRecord(recordType string, IP string) {
 	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
 }
 
-func updateIP(IPversion IPVersion) {
-	recordType := ""
-	switch IPversion {
-	case IPv4:
-		recordType = "A"
-	case IPv6:
-		recordType = "AAAA"
-	default:
-		log.WithField("IPversion", IPversion).Error("[updateIP] Invalid IP Version")
+func updateIP(version IPVersion) {
+	recordType := version.getRecordType()
+	if recordType == "" {
+		log.WithField("IPversion", version).Error("[updateIP] Invalid IP Version")
 		return
 	}
 
