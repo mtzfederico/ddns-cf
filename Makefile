@@ -6,6 +6,7 @@ build:
 	go build -o bin/ddns-cf
 
 update:
+	cp /home/fedemtz/ddns-cf/bin/ddns-cf /home/fedemtz/ddns-cf/bin/prev-ddns-cf-$(shell date +%Y-%m-%d_%H-%M-%S)
 	git pull
 	make build
 
