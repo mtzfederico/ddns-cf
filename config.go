@@ -29,8 +29,13 @@ type Config struct {
 	DisableIPv4 bool `yaml:"DisableIPv4"`
 	// Disable checking and updating IPv6 and AAAA Records
 	DisableIPv6 bool `yaml:"DisableIPv6"`
-	//  The path to a script or binary that gets executed when the IP address changes. The arguments are: the IP version ("v4" or "v6"), the old IP, the new IP, and the updated FQDN in that order.
+	//  The path to a script or binary that gets executed when the IP address changes.
+	// The arguments are: the IP version ("v4" or "v6"), the old IP, the new IP, and the updated FQDN in that order.
 	ScriptOnChange string `yaml:"ScriptOnChange"`
+	// The path to a script or binary that gets executed when there is an error updating the IP Address. It only gets called if updating or creating a record fails.
+	// It does not get called if the program is not able to get the current IP.
+	// The arguments are: the error, the IP version ("v4" or "v6"), the old IP, the new IP, and the updated FQDN in that order.
+	ScriptOnError string `yaml:"ScriptOnError"`
 	// The path to a file to save logs to. To log to stdout, set it to'stdout'. Log library defaults to stderr.
 	LogFile string `yaml:"LogFile"`
 	// The level of details to log. The options from less detail to very detailed are: panic, fatal, error, warning, info, debug, and trace
