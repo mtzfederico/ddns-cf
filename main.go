@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Jeffail/gabs"
 	log "github.com/sirupsen/logrus"
@@ -121,7 +122,7 @@ func getIP(ipVersion IPVersion) string {
 func getZoneID() string {
 	// Get domain's zone id. data.result[0].id
 	// https://api.cloudflare.com/#zone-list-zones
-	url := "zones?name=%s" + conf.Domain
+	url := "zones?name=" + conf.Domain
 	resp := sendRequest(url, "GET", nil)
 	zoneID, ok := resp.S("result").Index(0).Path("id").Data().(string)
 	if !ok {
@@ -132,6 +133,7 @@ func getZoneID() string {
 }
 
 // Get the domain's current value for the specified record type (A, AAAA, TXT, etc.)
+// returns "" when there is no value
 func getCurrentValue(recordType string) (string, string, error) {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-list-dns-records
 	// name is the FQDN. 'subdomain.domain.tld' or 'domain.tld'
@@ -195,7 +197,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	return content, RecordID, nil
 }
 
-func updateRecord(recordID string, recordType string, IP string) {
+func updateRecord(recordID string, recordType string, IP string) error {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-update-dns-record
 	path := "zones/" + conf.DomainZoneID + "/dns_records/" + recordID
 	ttl := conf.RecordTTL
@@ -220,13 +222,13 @@ func updateRecord(recordID string, recordType string, IP string) {
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
-		log.WithFields(log.Fields{"errorMessage": errorMessage}).Error("[updateRecord] Failed to update the record")
-		return
+		return fmt.Errorf("Failed to update the record. %s", errorMessage)
 	}
 	log.WithFields(log.Fields{"recordType": recordType}).Info("record changed successfully")
+	return nil
 }
 
-func createRecord(recordType string, IP string) {
+func createRecord(recordType string, IP string) error {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-create-dns-record
 	path := "zones/" + conf.DomainZoneID + "/dns_records"
 	ttl := conf.RecordTTL
@@ -251,10 +253,10 @@ func createRecord(recordType string, IP string) {
 
 	if !success {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
-		log.WithFields(log.Fields{"errorMessage": errorMessage}).Info("[createRecord] Failed to create record")
-		return
+		return fmt.Errorf("Failed to create the record. %s", errorMessage)
 	}
 	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
+	return nil
 }
 
 func updateIP(version IPVersion) {
@@ -265,40 +267,72 @@ func updateIP(version IPVersion) {
 	}
 
 	// The device's public address
-	IP := getIP(IPversion)
+	IP := getIP(version)
 
 	if IP == "" {
 		// fmt.Printf("%sNo IP%s address found%s\n", color.Red, IPversion, color.Red)
-		log.WithFields(log.Fields{"Version": IPversion}).Info("No IP address found")
+		log.WithFields(log.Fields{"version": version}).Info("No IP address found")
 		return
 	}
 
-	domainIP, recordID, err := getCurrentValue(recordType) // returns "" when there is no value
+	if !conf.DisableCFCache {
+		cachedIP, err := getCachedIP(version)
 
+		if err == nil {
+			// If the chahe is less than 3 hours old, use it.
+			if time.Since(cachedIP.Time) < 3*time.Hour {
+				if IP == cachedIP.IPAddress {
+					// This would only NOT trigger a change if the IP has been changed in CF and the actual IP has not changed.
+					log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed. Cache used.")
+					return
+				}
+			}
+		} else {
+			log.WithFields(log.Fields{"error": err, "version": version}).Error("[updateIP] Failed to get cache.")
+		}
+	}
+
+	domainIP, recordID, err := getCurrentValue(recordType)
+
+	// The record doesn't exist. Create it with the current IP
 	if err != nil && domainIP == "" && recordID == "" {
 		// create the record
 		// fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
-		log.WithFields(log.Fields{"Version": IPversion, "IP": IP}).Info("IP address detected for the first time")
-		createRecord(recordType, IP)
-		runUpdateScript(IPversion, domainIP, IP)
+		log.WithFields(log.Fields{"version": version, "IP": IP}).Info("IP address detected for the first time")
+		err = createRecord(recordType, IP)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "version": version, "domainIP": domainIP}).Error("[updateIP] Error creating domain record")
+			runErrorScript(err, version, domainIP, IP)
+			return
+		}
+		runUpdateScript(version, domainIP, IP)
+		setCachedIP(IP, version)
 		return
 	}
 
 	if err != nil {
-		log.WithFields(log.Fields{"err": err, "recordType": recordType, "domainIP": domainIP, "recordID": recordID}).Info("[updateIP] Error getting the domain's record")
+		log.WithFields(log.Fields{"err": err, "version": version, "domainIP": domainIP, "recordID": recordID}).Info("[updateIP] Error getting the domain's record")
 		return
 	}
 
 	if domainIP != IP {
 		// fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
-		log.WithFields(log.Fields{"Version": IPversion, "from": domainIP, "to": IP}).Info("IP address changed")
-		updateRecord(recordID, recordType, IP)
-		runUpdateScript(IPversion, domainIP, IP)
+		log.WithFields(log.Fields{"version": version, "from": domainIP, "to": IP}).Info("IP address changed")
+		err = updateRecord(recordID, recordType, IP)
+		if err != nil {
+			log.WithFields(log.Fields{"err": err, "version": version, "domainIP": domainIP}).Error("[updateIP] Error updating domain record")
+			runErrorScript(err, version, domainIP, IP)
+			return
+		}
+		runUpdateScript(version, domainIP, IP)
+		setCachedIP(IP, version)
 		return
 	}
 
 	// fmt.Printf("%sIP%s address has not changed: %s%s\n", color.Green, IPversion, color.Reset, IP)
-	log.WithFields(log.Fields{"Version": IPversion, "ip": IP}).Info("IP address has not changed")
+	log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed")
+	// refresh the cache's time if it has not changed
+	setCachedIP(domainIP, version)
 }
 
 func main() {
@@ -354,6 +388,3 @@ func main() {
 
 	httpClient.CloseIdleConnections()
 }
-
-// Todo:
-// * Create install script that compiles and creates systemd timer

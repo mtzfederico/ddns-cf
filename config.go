@@ -29,6 +29,8 @@ type Config struct {
 	DisableIPv4 bool `yaml:"DisableIPv4"`
 	// Disable checking and updating IPv6 and AAAA Records
 	DisableIPv6 bool `yaml:"DisableIPv6"`
+	// Disable Cloudflare IP caching
+	DisableCFCache bool `yaml:"DisableCFCache"`
 	//  The path to a script or binary that gets executed when the IP address changes.
 	// The arguments are: the IP version ("v4" or "v6"), the old IP, the new IP, and the updated FQDN in that order.
 	ScriptOnChange string `yaml:"ScriptOnChange"`
