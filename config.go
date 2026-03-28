@@ -45,7 +45,7 @@ type Config struct {
 func (c *Config) get(configPath string) *Config {
 	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
-		log.Printf("yamlFile.Get err   #%v ", err)
+		log.WithFields(log.Fields{"err": err}).Fatal("[Config Get] Failed to read config file")
 	}
 	err = yaml.Unmarshal(yamlFile, c)
 	if err != nil {
