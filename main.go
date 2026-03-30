@@ -295,6 +295,8 @@ func updateIP(version IPVersion) {
 					log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed. Cache used")
 					return
 				}
+			} else {
+				log.WithField("cachedIPTime", cachedIP.Time).Debug("IP Cache Expired")
 			}
 		} else {
 			log.WithFields(log.Fields{"error": err, "version": version}).Error("[updateIP] Failed to get cache.")
