@@ -2,13 +2,15 @@
 # https://stackoverflow.com/questions/20829155/how-to-cross-compile-from-windows-to-linux
 
 build:
-	go get .
+	go mod download
+	go generate
 	go build -o bin/ddns-cf
 
 update:
 	cp /home/fedemtz/ddns-cf/bin/ddns-cf /home/fedemtz/ddns-cf/bin/prev-ddns-cf-$(shell date +%Y-%m-%d_%H-%M-%S)
 	git pull
-	make build
+	$(MAKE) build
 
 dev:
+	go generate
 	go build -o bin/ddns-cf-dev

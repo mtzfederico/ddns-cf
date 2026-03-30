@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -14,6 +15,13 @@ import (
 	"github.com/Jeffail/gabs"
 	log "github.com/sirupsen/logrus"
 )
+
+// Build info. <Full Hash>_<Date in ISO8601>__<Build date in ISO8601>
+// https://icinga.com/blog/embedding-git-commit-information-in-go-binaries/
+//
+//go:generate sh -c "printf %s__%s $(git log -1 --format='%H_%cI') $(date +'%Y-%m-%dT%H:%M:%S%z') > build_info.ignore"
+//go:embed build_info.ignore
+var BuildInfo string
 
 // An IP Version
 //
@@ -33,9 +41,9 @@ func (version IPVersion) getRecordType() string {
 
 const (
 	baseURL   string    = "https://api.cloudflare.com/client/v4/"
+	UserAgent string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
 	IPv4      IPVersion = "v4"
 	IPv6      IPVersion = "v6"
-	UserAgent string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
 )
 
 var conf Config
@@ -256,7 +264,7 @@ func createRecord(recordType string, IP string) error {
 		errorMessage, _ := resp.S("errors").Index(0).Path("message").Data().(string)
 		return fmt.Errorf("Failed to create the record. %s", errorMessage)
 	}
-	log.WithFields(log.Fields{"recordType": IP}).Info("record created successfully")
+	log.WithFields(log.Fields{"recordType": recordType, "IP": IP}).Info("record created successfully")
 	return nil
 }
 
@@ -284,7 +292,7 @@ func updateIP(version IPVersion) {
 			if time.Since(cachedIP.Time) < 3*time.Hour {
 				if IP == cachedIP.IPAddress {
 					// This would only NOT trigger a change if the IP has been changed in CF and the actual IP has not changed.
-					log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed. Cache used.")
+					log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed. Cache used")
 					return
 				}
 			}
@@ -337,8 +345,14 @@ func updateIP(version IPVersion) {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "Display version info")
 	configPath := flag.String("config", "config.yaml", "Path to the configuration file")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("Version: %s\n", BuildInfo)
+		return
+	}
 
 	if *configPath == "" {
 		log.Fatal("[main] config flag missing. use --config path/to/config.yaml")
@@ -358,6 +372,8 @@ func main() {
 			log.SetLevel(level)
 		}
 	}
+
+	log.WithField("BuildInfo", BuildInfo).Trace("[main] Starting")
 
 	if conf.APIKey == "" {
 		log.Fatal("No APIkey found in config.yaml")
