@@ -6,8 +6,10 @@ Requires=ddns-cf.service
 
 [Timer]
 Unit=ddns-cf.service
+# Run 3 minutes after boot
 OnBootSec=3min
-OnUnitActiveSec=12min
+# Run 5 minutes after the last run finished
+OnUnitInactiveSec=5min
 
 [Install]
 WantedBy=timers.target
