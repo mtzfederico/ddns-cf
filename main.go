@@ -347,7 +347,8 @@ func updateIP(version IPVersion) {
 }
 
 func main() {
-	showVersion := flag.Bool("version", false, "Display version info")
+	showVersion := flag.Bool("version", false, "Display version info and exits")
+	showConfig := flag.Bool("showConfig", false, "Displays the config file parsed and exits")
 	configPath := flag.String("config", "config.yaml", "Path to the configuration file")
 	flag.Parse()
 
@@ -364,6 +365,11 @@ func main() {
 	conf.get(*configPath)
 
 	setupLogOutput()
+
+	if *showConfig {
+		fmt.Printf("%+v\n", conf)
+		return
+	}
 
 	if conf.LogLevel != "" {
 		level, err := log.ParseLevel(conf.LogLevel)
