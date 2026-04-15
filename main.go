@@ -24,22 +24,6 @@ import (
 //go:embed build_info.ignore
 var BuildInfo string
 
-// An IP Version
-//
-// The value is used to form the URL to get the device's public IP.
-type IPVersion string
-
-func (version IPVersion) getRecordType() string {
-	switch version {
-	case IPv4:
-		return "A"
-	case IPv6:
-		return "AAAA"
-	default:
-		return ""
-	}
-}
-
 var (
 	NoRecordFoundErr                 = errors.New("domain/subdomain does not exist")
 	noIPAddressFoundErr              = errors.New("No IP address found")
@@ -51,10 +35,8 @@ var (
 )
 
 const (
-	cfApiBaseURL string    = "https://api.cloudflare.com/client/v4/"
-	UserAgent    string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
-	IPv4         IPVersion = "v4"
-	IPv6         IPVersion = "v6"
+	cfApiBaseURL string = "https://api.cloudflare.com/client/v4/"
+	UserAgent    string = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
 )
 
 var conf Config
