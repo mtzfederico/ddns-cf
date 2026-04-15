@@ -233,7 +233,7 @@ func updateRecord(recordID string, recordType string, IP net.IP) error {
 	var requestBody RecordData
 	requestBody.Type = recordType
 	requestBody.Name = conf.name
-	requestBody.Content = IP.String()
+	requestBody.Content = ipToString(IP)
 	requestBody.TTL = ttl
 	requestBody.Proxied = conf.IsProxied
 
@@ -321,7 +321,7 @@ func updateIP(version IPVersion) {
 		// create the record
 		// fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
 		log.WithFields(log.Fields{"version": version, "IP": IP}).Info("IP address detected for the first time")
-		err = createRecord(recordType, IP.String())
+		err = createRecord(recordType, ipToString(IP))
 		if err != nil {
 			log.WithFields(log.Fields{"err": err, "version": version, "domainIP": domainIP}).Error("[updateIP] Error creating domain record")
 			runErrorScript(err, version, domainIP, IP)
