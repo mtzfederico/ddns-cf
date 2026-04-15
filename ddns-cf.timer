@@ -6,10 +6,10 @@ Requires=ddns-cf.service
 
 [Timer]
 Unit=ddns-cf.service
-# Run 3 minutes after boot
+# Run 3 minutes after boot to make sure the CPE has booted and received an address afer a power failure
 OnBootSec=3min
-# Run 5 minutes after the last run finished
-OnUnitInactiveSec=5min
+# Run 2.5 minutes after the last run finished
+OnUnitInactiveSec=150
 
 [Install]
 WantedBy=timers.target
