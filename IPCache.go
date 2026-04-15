@@ -23,7 +23,7 @@ type IPCache struct {
 func getCachedIP(version IPVersion) (IPCache, error) {
 	recordType := version.getRecordType()
 
-	path := filepath.Join(os.TempDir(), "ddns-cf-"+recordType+"-cache.json")
+	path := getCacheFilePath(recordType)
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -54,7 +54,7 @@ func setCachedIP(address net.IP, version IPVersion) {
 		return
 	}
 
-	path := filepath.Join(os.TempDir(), "ddns-cf-"+recordType+"-cache.json")
+	path := getCacheFilePath(recordType)
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0664)
 
 	if err != nil {
@@ -69,4 +69,8 @@ func setCachedIP(address net.IP, version IPVersion) {
 	}
 
 	log.WithFields(log.Fields{"path": path}).Debug("[setCachedIP] Cache Set")
+}
+
+func getCacheFilePath(recordType string) string {
+	return filepath.Join(os.TempDir(), "ddns-cf-cache", conf.name+"-"+recordType+".json")
 }
