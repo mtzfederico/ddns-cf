@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -38,6 +39,16 @@ func (version IPVersion) getRecordType() string {
 		return ""
 	}
 }
+
+var (
+	NoRecordFoundErr                 = errors.New("domain/subdomain does not exist")
+	noIPAddressFoundErr              = errors.New("No IP address found")
+	invalidIPAddressErr              = errors.New("Invalid IPAddress")
+	invalidIPVersionErr              = errors.New("Invalid IP Version")
+	FailedToDecodeJSONErr            = errors.New("failed to decode JSON")
+	failedToParseRecordIDFromJSON    = errors.New("failed to parse the record's ID from JSON")
+	failedToParseRecordValueFromJSON = errors.New("failed to parse the record's value from JSON")
+)
 
 const (
 	cfApiBaseURL string    = "https://api.cloudflare.com/client/v4/"
@@ -103,7 +114,7 @@ func sendRequest(path string, method string, requestBody []byte) *gabs.Container
 	return jsonParsed
 }
 
-func getIP(ipVersion IPVersion) string {
+func getIP(ipVersion IPVersion) (net.IP, error) {
 	url := "https://ip" + string(ipVersion) + ".icanhazip.com"
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -117,7 +128,7 @@ func getIP(ipVersion IPVersion) string {
 
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "ipVersion": ipVersion}).Fatal("[getIP] Error sending request")
-		return ""
+		return nil, fmt.Errorf("Error sending get IP%s request: %w", string(ipVersion), err)
 	}
 	defer resp.Body.Close()
 
@@ -125,7 +136,21 @@ func getIP(ipVersion IPVersion) string {
 	if err != nil {
 		log.WithFields(log.Fields{"error": err, "resp": resp}).Fatal("[getIP] Error processing response")
 	}
-	return strings.TrimSuffix(string(body), "\n")
+
+	// TODO: remove other chars such as space. check if parseip needs this
+	addrStr := strings.TrimSuffix(string(body), "\n")
+
+	if addrStr == "" {
+		return nil, noIPAddressFoundErr
+	}
+
+	// The main reason for this is to make it easier to compare values, specially for v6 since it can be in different formats.
+	address := net.ParseIP(addrStr)
+	if address == nil {
+		return nil, invalidIPAddressErr
+	}
+
+	return address, nil
 }
 
 func getZoneID() string {
@@ -142,8 +167,14 @@ func getZoneID() string {
 }
 
 // Get the domain's current value for the specified record type (A, AAAA, TXT, etc.)
+//
+// Returns Value, recordID, error.
 // returns "" when there is no value
-func getCurrentValue(recordType string) (string, string, error) {
+func getCurrentValue(version IPVersion) (net.IP, string, error) {
+	recordType := version.getRecordType()
+	if recordType == "" {
+		return nil, "", invalidIPVersionErr
+	}
 	// https://api.cloudflare.com/#dns-records-for-a-zone-list-dns-records
 	// name is the FQDN. 'subdomain.domain.tld' or 'domain.tld'
 	zoneID := conf.DomainZoneID
@@ -159,7 +190,7 @@ func getCurrentValue(recordType string) (string, string, error) {
 	success, ok := resp.Path("success").Data().(bool)
 
 	if !ok {
-		return "", "", errors.New("failed to decode JSON")
+		return nil, "", FailedToDecodeJSONErr
 	}
 
 	if !success {
@@ -167,46 +198,49 @@ func getCurrentValue(recordType string) (string, string, error) {
 		error := resp.S("errors").Index(0)
 		errorCode := error.Path("code").Data().(string)
 		if errorCode == "7003" {
-			return "", "", errors.New("domain/subdomain does not exist")
+			return nil, "", NoRecordFoundErr
 		}
-		return "", "", fmt.Errorf("errorCode: %s: %s", errorCode, error.Path("message").Data().(string))
+		return nil, "", fmt.Errorf("errorCode %s: %s", errorCode, error.Path("message").Data().(string))
 	}
 
 	result := resp.S("result")
 	resultLen, err := result.ArrayCount()
 
 	if err != nil {
-		return "", "", err
+		return nil, "", fmt.Errorf("Failed to get length of result: %w", err)
 	}
 
 	// the subdomain exists but there is no record for this type. There is an A record but no AAAA record or vice versa.
 	if resultLen == 0 {
-		return "", "", fmt.Errorf("no record of type %s for %s", recordType, conf._Name)
+		return nil, "", fmt.Errorf("no record of type %s for %s", recordType, conf._Name)
 	}
 
 	content, ok := result.Index(0).Path("content").Data().(string) // The record's value
 	if !ok {
-		return "", "", errors.New("failed to decode the record's value from JSON")
+		return nil, "", failedToParseRecordValueFromJSON
 	}
 
 	if content == "" {
-		return content, "", fmt.Errorf("no Content for %s's %s record", conf._Name, recordType)
+		return nil, "", fmt.Errorf("no Content for %s's %s record", conf._Name, recordType)
 
 	}
 
 	RecordID, ok := result.Index(0).Path("id").Data().(string) // The id of the actual A or AAAA record, needed to update it.
 	if !ok {
-		return "", "", errors.New("failed to decode the record's ID from JSON")
+		return nil, "", failedToParseRecordIDFromJSON
 	}
 
 	if RecordID == "" {
-		return content, "", fmt.Errorf("no recordID for %s's %s record", conf._Name, recordType)
+		return nil, "", fmt.Errorf("no recordID for %s's %s record", conf._Name, recordType)
 	}
 
-	return content, RecordID, nil
+	recordValue := net.ParseIP(content)
+
+	return recordValue, RecordID, nil
 }
 
-func updateRecord(recordID string, recordType string, IP string) error {
+// Update the IP Address of recordID specified.
+func updateRecord(recordID string, recordType string, IP net.IP) error {
 	// https://api.cloudflare.com/#dns-records-for-a-zone-update-dns-record
 	path := "zones/" + conf.DomainZoneID + "/dns_records/" + recordID
 	ttl := conf.RecordTTL
@@ -217,7 +251,7 @@ func updateRecord(recordID string, recordType string, IP string) error {
 	var requestBody RecordData
 	requestBody.Type = recordType
 	requestBody.Name = conf._Name
-	requestBody.Content = IP
+	requestBody.Content = IP.String()
 	requestBody.TTL = ttl
 	requestBody.Proxied = conf.IsProxied
 
@@ -270,17 +304,12 @@ func createRecord(recordType string, IP string) error {
 
 func updateIP(version IPVersion) {
 	recordType := version.getRecordType()
-	if recordType == "" {
-		log.WithField("IPversion", version).Error("[updateIP] Invalid IP Version")
-		return
-	}
 
 	// The device's public address
-	IP := getIP(version)
-
-	if IP == "" {
+	IP, err := getIP(version)
+	if err != nil {
 		// fmt.Printf("%sNo IP%s address found%s\n", color.Red, IPversion, color.Red)
-		log.WithFields(log.Fields{"version": version}).Info("No IP address found")
+		log.WithFields(log.Fields{"version": version, "error": err}).Error("getIP Failed")
 		return
 	}
 
@@ -290,7 +319,7 @@ func updateIP(version IPVersion) {
 		if err == nil {
 			// If the chahe is less than 3 hours old, use it.
 			if time.Since(cachedIP.Time) < 3*time.Hour {
-				if IP == cachedIP.IPAddress {
+				if IP.Equal(cachedIP.IPAddress) {
 					// This would only NOT trigger a change if the IP has been changed in CF and the actual IP has not changed.
 					log.WithFields(log.Fields{"version": version, "ip": IP}).Info("IP address has not changed. Cache used")
 					return
@@ -303,14 +332,14 @@ func updateIP(version IPVersion) {
 		}
 	}
 
-	domainIP, recordID, err := getCurrentValue(recordType)
+	domainIP, recordID, err := getCurrentValue(version)
 
 	// The record doesn't exist. Create it with the current IP
-	if err != nil && domainIP == "" && recordID == "" {
+	if err != nil && domainIP == nil && recordID == "" {
 		// create the record
 		// fmt.Printf("%sIP%s address detected for the first time: %s%s\n", color.Purple, IPversion, color.Reset, IP)
 		log.WithFields(log.Fields{"version": version, "IP": IP}).Info("IP address detected for the first time")
-		err = createRecord(recordType, IP)
+		err = createRecord(recordType, IP.String())
 		if err != nil {
 			log.WithFields(log.Fields{"err": err, "version": version, "domainIP": domainIP}).Error("[updateIP] Error creating domain record")
 			runErrorScript(err, version, domainIP, IP)
@@ -326,7 +355,7 @@ func updateIP(version IPVersion) {
 		return
 	}
 
-	if domainIP != IP {
+	if !domainIP.Equal(IP) {
 		// fmt.Printf("%sIP%s address changed: %s%s %s->%s %s\n", color.Purple, IPversion, color.Reset, domainIP, color.Purple, color.Reset, IP)
 		log.WithFields(log.Fields{"version": version, "from": domainIP, "to": IP}).Info("IP address changed")
 		err = updateRecord(recordID, recordType, IP)

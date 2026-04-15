@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,7 +13,7 @@ import (
 // A struct used to cached the IP address stored in Cloudlare
 type IPCache struct {
 	// The IP address cached
-	IPAddress string `json:"IPAddress" binding:"required"`
+	IPAddress net.IP `json:"IPAddress" binding:"required"`
 	// The type of DNS record cached (A or AAAA).
 	RecordType string `json:"RecordType" binding:"required"`
 	// The time that it was last checked
@@ -26,19 +27,19 @@ func getCachedIP(version IPVersion) (IPCache, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return IPCache{IPAddress: "", RecordType: IPv6.getRecordType(), Time: time.UnixMicro(1)}, err
+		return IPCache{IPAddress: nil, RecordType: IPv6.getRecordType(), Time: time.UnixMicro(1)}, err
 	}
 
 	var cache IPCache
 	err = json.Unmarshal(data, &cache)
 	if err != nil {
-		return IPCache{IPAddress: "", RecordType: IPv6.getRecordType(), Time: time.UnixMicro(1)}, err
+		return IPCache{IPAddress: nil, RecordType: IPv6.getRecordType(), Time: time.UnixMicro(1)}, err
 	}
 
 	return cache, nil
 }
 
-func setCachedIP(address string, version IPVersion) {
+func setCachedIP(address net.IP, version IPVersion) {
 	if conf.DisableCFCache {
 		return
 	}

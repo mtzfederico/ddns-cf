@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"testing"
 )
 
@@ -8,7 +9,7 @@ import (
 // and run the tests and the benchmarks with go test -bench=.
 
 func TestSetCachedIP(t *testing.T) {
-	setCachedIP("127.0.0.2", IPv6)
+	setCachedIP(net.ParseIP("127.0.0.2"), IPv6)
 }
 
 func TestGetCachedIP(t *testing.T) {
