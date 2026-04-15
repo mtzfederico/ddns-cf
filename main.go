@@ -40,10 +40,10 @@ func (version IPVersion) getRecordType() string {
 }
 
 const (
-	baseURL   string    = "https://api.cloudflare.com/client/v4/"
-	UserAgent string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
-	IPv4      IPVersion = "v4"
-	IPv6      IPVersion = "v6"
+	cfApiBaseURL string    = "https://api.cloudflare.com/client/v4/"
+	UserAgent    string    = "ddns-cf/1.1 (github.com/mtzfederico/ddns-cf)"
+	IPv4         IPVersion = "v4"
+	IPv6         IPVersion = "v6"
 )
 
 var conf Config
@@ -58,7 +58,7 @@ type RecordData struct {
 }
 
 func sendRequest(path string, method string, requestBody []byte) *gabs.Container {
-	url := baseURL + path
+	url := cfApiBaseURL + path
 	// fmt.Printf("%s%s %s%s\n", color.Yellow, method, url, color.Reset)
 	log.WithFields(log.Fields{"method": method, "url": url}).Trace(("[sendRequest] Sending request"))
 
