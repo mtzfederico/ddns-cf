@@ -11,7 +11,7 @@ import (
 
 type Config struct {
 	// Complete FQDN to update. Set by the program.
-	_Name string
+	name string
 	//  The domain name to update
 	Domain string `yaml:"Domain" binding:"required"`
 	// The Cloudflare Zone ID for the Domain. If left empty, it will be fetched from Cloudflare. Setting it removes the need for an extra API call.
@@ -54,11 +54,11 @@ func (c *Config) get(configPath string) *Config {
 		log.Fatalf("Unmarshal: %v", err)
 	}
 
-	c._Name = ""
+	c.name = ""
 	if c.SubDomainToUpdate == "" {
-		c._Name = c.Domain
+		c.name = c.Domain
 	} else {
-		c._Name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
+		c.name = fmt.Sprintf("%s.%s", c.SubDomainToUpdate, c.Domain)
 	}
 
 	log.WithFields(log.Fields{"Domain": c.Domain, "SubDomainToUpdate": c.SubDomainToUpdate, "APIKey": c.APIKey, "RecordTTL": c.RecordTTL, "IsProxied": c.IsProxied, "DisableIPv4": c.DisableIPv4, "DisableIPv6": c.DisableIPv6, "ScriptOnChange": c.ScriptOnChange, "LogFile": c.LogFile, "LogLevel": c.LogLevel}).Trace("Config options")

@@ -184,7 +184,7 @@ func getCurrentValue(version IPVersion) (net.IP, string, error) {
 		zoneID = getZoneID()
 		conf.DomainZoneID = zoneID // save for later use but don't save to file
 	}
-	path := "zones/" + zoneID + "/dns_records?type=" + recordType + "&name=" + conf._Name
+	path := "zones/" + zoneID + "/dns_records?type=" + recordType + "&name=" + conf.name
 	resp := sendRequest(path, "GET", nil)
 
 	success, ok := resp.Path("success").Data().(bool)
@@ -212,7 +212,7 @@ func getCurrentValue(version IPVersion) (net.IP, string, error) {
 
 	// the subdomain exists but there is no record for this type. There is an A record but no AAAA record or vice versa.
 	if resultLen == 0 {
-		return nil, "", fmt.Errorf("no record of type %s for %s", recordType, conf._Name)
+		return nil, "", fmt.Errorf("no record of type %s for %s", recordType, conf.name)
 	}
 
 	content, ok := result.Index(0).Path("content").Data().(string) // The record's value
@@ -221,7 +221,7 @@ func getCurrentValue(version IPVersion) (net.IP, string, error) {
 	}
 
 	if content == "" {
-		return nil, "", fmt.Errorf("no Content for %s's %s record", conf._Name, recordType)
+		return nil, "", fmt.Errorf("no Content for %s's %s record", conf.name, recordType)
 
 	}
 
@@ -231,7 +231,7 @@ func getCurrentValue(version IPVersion) (net.IP, string, error) {
 	}
 
 	if RecordID == "" {
-		return nil, "", fmt.Errorf("no recordID for %s's %s record", conf._Name, recordType)
+		return nil, "", fmt.Errorf("no recordID for %s's %s record", conf.name, recordType)
 	}
 
 	recordValue := net.ParseIP(content)
@@ -250,7 +250,7 @@ func updateRecord(recordID string, recordType string, IP net.IP) error {
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = conf._Name
+	requestBody.Name = conf.name
 	requestBody.Content = IP.String()
 	requestBody.TTL = ttl
 	requestBody.Proxied = conf.IsProxied
@@ -281,7 +281,7 @@ func createRecord(recordType string, IP string) error {
 
 	var requestBody RecordData
 	requestBody.Type = recordType
-	requestBody.Name = conf._Name
+	requestBody.Name = conf.name
 	requestBody.Content = IP
 	requestBody.TTL = ttl
 	requestBody.Proxied = conf.IsProxied

@@ -12,7 +12,7 @@ func TestParseConfig(t *testing.T) {
 
 	conf.get("sampleConfig.yaml")
 
-	if conf._Name != "<subdomain>.<domain.tld>" {
+	if conf.name != "<subdomain>.<domain.tld>" {
 		t.Errorf("Unexpected Domain value, got: %s", conf.Domain)
 	}
 
