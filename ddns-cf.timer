@@ -1,4 +1,5 @@
 # Save in /etc/systemd/system/ddns-cf.timer then enable and start the timer
+# On update run 'systemctl daemon-reload'
 
 [Unit]
 Description=DDNS-CF script
