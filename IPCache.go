@@ -39,6 +39,7 @@ func getCachedIP(version IPVersion) (IPCache, error) {
 	return cache, nil
 }
 
+// Sets the cache for the IPVersion specified. If it fails, the error gets logged.
 func setCachedIP(address net.IP, version IPVersion) {
 	if conf.DisableCFCache {
 		return
@@ -55,6 +56,13 @@ func setCachedIP(address net.IP, version IPVersion) {
 	}
 
 	path := getCacheFilePath(recordType)
+	// Everybody can RX, only owner can W
+	err = os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err, "path": path}).Error("[setCachedIP] Failed to make directory for cache")
+		return
+	}
+	// Everybody can R, only owner and group can W
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0664)
 
 	if err != nil {
